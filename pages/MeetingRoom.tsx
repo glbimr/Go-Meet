@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { 
   Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, 
-  Users, Settings, Shield, Signal, X, Loader, Share2
+  Users, Settings, Shield, Signal, X, Loader, Share2,
+  Copy, Check, MessageCircle, Send, MessageSquare, Instagram
 } from 'lucide-react';
 import { generateMockNetworkStats } from '../services/networkService';
 import { NetworkStats } from '../types';
@@ -67,6 +68,8 @@ const MeetingRoom: React.FC = () => {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
   const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
   
   // WebRTC State
   const [participants, setParticipants] = useState<PeerData[]>([]);
@@ -235,9 +238,10 @@ const MeetingRoom: React.FC = () => {
     }
   };
 
-  const handleShare = () => {
-    const text = `Join my UniConnect secure meeting: ${window.location.href}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  const handleCopy = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   // WebRTC Signaling Logic
@@ -359,9 +363,9 @@ const MeetingRoom: React.FC = () => {
           )}
 
           <button 
-            onClick={handleShare}
+            onClick={() => setShowShareModal(true)}
             className="p-2 rounded-lg hover:bg-slate-700 transition-colors text-slate-300 hover:text-green-400"
-            title="Share via WhatsApp"
+            title="Share"
           >
             <Share2 size={20} />
           </button>
@@ -512,6 +516,88 @@ const MeetingRoom: React.FC = () => {
             </button>
          </div>
       </div>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl relative">
+            <button 
+              onClick={() => setShowShareModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+            
+            <h3 className="text-xl font-bold text-white mb-6">Share Invitation</h3>
+            
+            {/* Copy Link Section */}
+            <div className="bg-slate-900 rounded-xl p-3 flex items-center justify-between border border-slate-700 mb-6">
+              <span className="text-sm text-slate-400 truncate mr-4 font-mono select-all">
+                {window.location.href}
+              </span>
+              <button 
+                onClick={handleCopy}
+                className={`p-2 rounded-lg transition-all ${copied ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-600'}`}
+              >
+                {copied ? <Check size={18} /> : <Copy size={18} />}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-4 gap-4">
+              {/* WhatsApp */}
+              <a 
+                href={`https://wa.me/?text=${encodeURIComponent(`Join my UniConnect secure meeting: ${window.location.href}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-2 group"
+              >
+                <div className="w-12 h-12 rounded-full bg-[#25D366] flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+                  <MessageCircle size={24} />
+                </div>
+                <span className="text-xs text-slate-400 group-hover:text-white transition-colors">WhatsApp</span>
+              </a>
+
+              {/* Telegram */}
+              <a 
+                href={`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent('Join my UniConnect secure meeting')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-2 group"
+              >
+                <div className="w-12 h-12 rounded-full bg-[#0088cc] flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+                  <Send size={24} />
+                </div>
+                <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Telegram</span>
+              </a>
+
+              {/* Messages */}
+              <a 
+                href={`sms:?body=${encodeURIComponent(`Join my UniConnect secure meeting: ${window.location.href}`)}`}
+                className="flex flex-col items-center gap-2 group"
+              >
+                <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+                  <MessageSquare size={24} />
+                </div>
+                <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Messages</span>
+              </a>
+
+              {/* Instagram (Copy & Open) */}
+               <button 
+                onClick={() => {
+                  handleCopy();
+                  window.open('https://instagram.com', '_blank');
+                }}
+                className="flex flex-col items-center gap-2 group"
+              >
+                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+                  <Instagram size={24} />
+                </div>
+                <span className="text-xs text-slate-400 group-hover:text-white transition-colors">Instagram</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
