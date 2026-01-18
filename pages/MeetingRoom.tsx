@@ -22,6 +22,34 @@ interface PeerData {
   isHost: boolean;
 }
 
+// Stable Video Component to prevent flickering on re-renders
+const VideoFeed: React.FC<{ 
+  stream: MediaStream | null; 
+  isMirrored?: boolean; 
+  isMuted?: boolean;
+  className?: string;
+  id?: string;
+}> = ({ stream, isMirrored = false, isMuted = false, className = '', id }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return (
+    <video
+      id={id}
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted={isMuted}
+      className={`w-full h-full object-cover ${isMirrored ? 'transform scale-x-[-1]' : ''} ${className}`}
+    />
+  );
+};
+
 const MeetingRoom: React.FC = () => {
   const { meetingId } = useParams();
   const navigate = useNavigate();
@@ -44,7 +72,9 @@ const MeetingRoom: React.FC = () => {
   const [participants, setParticipants] = useState<PeerData[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   
-  const localVideoRef = useRef<HTMLVideoElement>(null);
+  // We track the active local stream in state to pass it to the VideoFeed component
+  const [localDisplayStream, setLocalDisplayStream] = useState<MediaStream | null>(null);
+
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -60,9 +90,7 @@ const MeetingRoom: React.FC = () => {
           audio: true 
         });
         localStreamRef.current = stream;
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-        }
+        setLocalDisplayStream(stream);
       } catch (err) {
         console.error("Failed to access media:", err);
       }
@@ -149,10 +177,8 @@ const MeetingRoom: React.FC = () => {
       
       screenStreamRef.current = stream;
       
-      // Update local preview
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
+      // Update local preview state
+      setLocalDisplayStream(stream);
 
       // Replace tracks for existing peers
       peerConnectionsRef.current.forEach((pc) => {
@@ -181,8 +207,8 @@ const MeetingRoom: React.FC = () => {
     }
 
     // Revert to camera
-    if (localStreamRef.current && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current;
+    if (localStreamRef.current) {
+      setLocalDisplayStream(localStreamRef.current);
       
       const cameraTrack = localStreamRef.current.getVideoTracks()[0];
       if (cameraTrack) {
@@ -347,13 +373,11 @@ const MeetingRoom: React.FC = () => {
               
               {/* Local Video */}
               <div className="relative bg-slate-800 rounded-xl overflow-hidden border-2 border-slate-700 aspect-video group">
-                <video 
-                  ref={localVideoRef}
-                  autoPlay 
-                  muted 
-                  playsInline
-                  // Don't mirror if screen sharing. Hide if video off AND not screen sharing.
-                  className={`w-full h-full object-cover transform ${isScreenSharing ? '' : 'scale-x-[-1]'} ${isVideoOff && !isScreenSharing ? 'hidden' : 'block'}`}
+                <VideoFeed 
+                  stream={localDisplayStream}
+                  isMirrored={!isScreenSharing}
+                  isMuted={true} // Local user always muted to self
+                  className={isVideoOff && !isScreenSharing ? 'hidden' : 'block'}
                 />
                 
                 {/* Placeholder when camera is off and not sharing screen */}
@@ -375,15 +399,9 @@ const MeetingRoom: React.FC = () => {
               {remoteParticipants.map((p) => (
                 <div key={p.peerId} className="relative bg-slate-800 rounded-xl overflow-hidden border-2 border-transparent aspect-video">
                   {remoteStreams[p.peerId] ? (
-                    <video
-                      autoPlay
-                      playsInline
-                      className="w-full h-full object-cover"
-                      ref={(el) => {
-                        if (el && remoteStreams[p.peerId]) {
-                          el.srcObject = remoteStreams[p.peerId];
-                        }
-                      }}
+                    <VideoFeed 
+                      stream={remoteStreams[p.peerId]}
+                      isMirrored={false}
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center w-full h-full bg-slate-800">
