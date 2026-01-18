@@ -1,0 +1,8 @@
+{
+  "name": "UniConnect",
+  "description": "A universal connectivity meeting platform with forced proxy IP routing simulation for stable, network-independent collaboration.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
