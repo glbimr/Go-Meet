@@ -10,8 +10,10 @@ const ProxyLoading: React.FC = () => {
   const { displayName, isHost } = location.state || { displayName: 'Anonymous', isHost: false };
   
   useEffect(() => {
+    if (!meetingId) return;
+
     // Logic runs in background (simulating backend checks) without UI updates
-    simulateHandshake(() => {
+    simulateHandshake(meetingId, () => {
       // Stage updates are ignored visually as per requirements
     }).then((ip) => {
       // Add a small buffer before transition for smoothness

@@ -12,8 +12,10 @@ import { supabase } from '../lib/supabaseClient';
 const RTC_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' }
-  ]
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'stun:stun.1.google.com:19302' } // Added redundant STUN
+  ],
+  iceCandidatePoolSize: 10,
 };
 
 interface PeerData {
@@ -57,9 +59,10 @@ const MeetingRoom: React.FC = () => {
   const location = useLocation();
   
   // Local User State
-  const virtualIp = location.state?.virtualIp || '10.8.0.x';
+  const virtualIp = location.state?.virtualIp || '10.0.0.x';
   const displayName = location.state?.displayName || 'Anonymous';
   const isHost = location.state?.isHost || false;
+  // Use a stable ID for the session
   const myPeerId = useRef(Math.random().toString(36).substr(2, 9)).current;
 
   // Media & UI State
@@ -82,6 +85,8 @@ const MeetingRoom: React.FC = () => {
   const screenStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const channelRef = useRef<any>(null);
+  // Queue for ICE candidates that arrive before Remote Description
+  const iceCandidateQueue = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
 
   // Initialize Media and Signal
   useEffect(() => {
@@ -133,12 +138,14 @@ const MeetingRoom: React.FC = () => {
               online_at: new Date().toISOString(),
             });
 
-            // Announce presence
-            channel.send({
-              type: 'broadcast',
-              event: 'signal',
-              payload: { type: 'new-peer', sender: myPeerId }
-            });
+            // Allow a brief moment for subscription to propagate before announcing
+            setTimeout(() => {
+              channel.send({
+                type: 'broadcast',
+                event: 'signal',
+                payload: { type: 'new-peer', sender: myPeerId }
+              });
+            }, 500);
           }
         });
     };
@@ -179,8 +186,6 @@ const MeetingRoom: React.FC = () => {
       const screenTrack = stream.getVideoTracks()[0];
       
       screenStreamRef.current = stream;
-      
-      // Update local preview state
       setLocalDisplayStream(stream);
 
       // Replace tracks for existing peers
@@ -191,7 +196,6 @@ const MeetingRoom: React.FC = () => {
         }
       });
 
-      // Handle browser "Stop sharing" UI
       screenTrack.onended = () => {
         stopScreenShare();
       };
@@ -203,21 +207,16 @@ const MeetingRoom: React.FC = () => {
   };
 
   const stopScreenShare = async () => {
-    // Stop the screen share stream
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach(track => track.stop());
       screenStreamRef.current = null;
     }
 
-    // Revert to camera
     if (localStreamRef.current) {
       setLocalDisplayStream(localStreamRef.current);
-      
       const cameraTrack = localStreamRef.current.getVideoTracks()[0];
       if (cameraTrack) {
-        // Ensure camera track respects current mute state
         cameraTrack.enabled = !isVideoOff;
-        
         peerConnectionsRef.current.forEach((pc) => {
           const sender = pc.getSenders().find(s => s.track?.kind === 'video');
           if (sender) {
@@ -251,18 +250,10 @@ const MeetingRoom: React.FC = () => {
     const pc = new RTCPeerConnection(RTC_CONFIG);
     
     // Add Tracks
-    // 1. Audio (Always from mic)
     if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach(track => {
+      localStreamRef.current.getTracks().forEach(track => {
         pc.addTrack(track, localStreamRef.current!);
       });
-    }
-
-    // 2. Video (Screen if sharing, otherwise Camera)
-    const videoTrack = screenStreamRef.current?.getVideoTracks()[0] || localStreamRef.current?.getVideoTracks()[0];
-    if (videoTrack && localStreamRef.current) {
-      // We attach the track to the localStream container so they arrive grouped
-      pc.addTrack(videoTrack, localStreamRef.current);
     }
 
     pc.onicecandidate = (event) => {
@@ -281,10 +272,19 @@ const MeetingRoom: React.FC = () => {
     };
 
     pc.ontrack = (event) => {
+      console.log(`Received track from ${peerId}: ${event.streams[0].id}`);
       setRemoteStreams(prev => ({
         ...prev,
         [peerId]: event.streams[0]
       }));
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log(`Connection state with ${peerId}: ${pc.connectionState}`);
+      if (pc.connectionState === 'failed') {
+        // Optional: Retry logic could go here
+        pc.restartIce();
+      }
     };
 
     peerConnectionsRef.current.set(peerId, pc);
@@ -297,6 +297,7 @@ const MeetingRoom: React.FC = () => {
 
     try {
       if (type === 'new-peer') {
+        // Received new-peer: Initiate connection by creating an Offer
         const pc = createPeerConnection(sender);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -307,8 +308,19 @@ const MeetingRoom: React.FC = () => {
         });
       }
       else if (type === 'offer') {
+        // Received Offer: Create Answer
         const pc = createPeerConnection(sender);
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        
+        // Process any queued candidates now that remote description is set
+        const queue = iceCandidateQueue.current.get(sender);
+        if (queue) {
+          for (const c of queue) {
+            await pc.addIceCandidate(new RTCIceCandidate(c));
+          }
+          iceCandidateQueue.current.delete(sender);
+        }
+
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         channelRef.current.send({
@@ -318,15 +330,32 @@ const MeetingRoom: React.FC = () => {
         });
       }
       else if (type === 'answer') {
+        // Received Answer: Finalize connection
         const pc = peerConnectionsRef.current.get(sender);
         if (pc) {
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          // Process any queued candidates
+          const queue = iceCandidateQueue.current.get(sender);
+          if (queue) {
+            for (const c of queue) {
+              await pc.addIceCandidate(new RTCIceCandidate(c));
+            }
+            iceCandidateQueue.current.delete(sender);
+          }
         }
       }
       else if (type === 'ice-candidate') {
+        // Received ICE Candidate
         const pc = peerConnectionsRef.current.get(sender);
         if (pc) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          if (pc.remoteDescription) {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } else {
+            // Queue candidate if remote description is not yet set
+            const queue = iceCandidateQueue.current.get(sender) || [];
+            queue.push(candidate);
+            iceCandidateQueue.current.set(sender, queue);
+          }
         }
       }
     } catch (err) {
@@ -430,7 +459,10 @@ const MeetingRoom: React.FC = () => {
 
                   <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full flex items-center space-x-2 z-10">
                     <span className="text-sm font-medium">{p.name}</span>
-                    {/* Removed IP display */}
+                    {/* Display virtual IP to reinforce the 'single network' concept */}
+                    <span className="text-xs text-emerald-400 ml-2 font-mono hidden sm:inline-block opacity-75">
+                      {p.ip}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -459,7 +491,7 @@ const MeetingRoom: React.FC = () => {
                       </p>
                       <p className="text-xs text-slate-400 flex items-center">
                         <Shield size={10} className="mr-1 text-emerald-500" />
-                        Secure Connection
+                        {p.ip}
                       </p>
                     </div>
                   </div>
