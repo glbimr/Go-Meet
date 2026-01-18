@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { 
   Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, 
-  Users, MessageSquare, Settings, Shield, Signal, Share2, X, Loader
+  Users, Settings, Shield, Signal, X, Loader
 } from 'lucide-react';
 import { generateMockNetworkStats } from '../services/networkService';
 import { NetworkStats } from '../types';
@@ -31,7 +31,6 @@ const MeetingRoom: React.FC = () => {
   const virtualIp = location.state?.virtualIp || '10.8.0.x';
   const displayName = location.state?.displayName || 'Anonymous';
   const isHost = location.state?.isHost || false;
-  // Generate a stable Peer ID for this session
   const myPeerId = useRef(Math.random().toString(36).substr(2, 9)).current;
 
   // Media & UI State
@@ -47,6 +46,7 @@ const MeetingRoom: React.FC = () => {
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const channelRef = useRef<any>(null);
 
@@ -65,7 +65,6 @@ const MeetingRoom: React.FC = () => {
         }
       } catch (err) {
         console.error("Failed to access media:", err);
-        // Fallback for no media permissions if needed, or handle error UI
       }
 
       // 2. Join Supabase Channel
@@ -103,7 +102,7 @@ const MeetingRoom: React.FC = () => {
               online_at: new Date().toISOString(),
             });
 
-            // Announce presence to existing peers to initiate connections
+            // Announce presence
             channel.send({
               type: 'broadcast',
               event: 'signal',
@@ -115,23 +114,26 @@ const MeetingRoom: React.FC = () => {
 
     init();
 
-    // Start Stats Simulation
     const statsInterval = setInterval(() => {
       setNetworkStats(generateMockNetworkStats(true));
     }, 2000);
 
     return () => {
-      // Cleanup
       if (channelRef.current) supabase.removeChannel(channelRef.current);
+      
+      // Stop all tracks
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => track.stop());
       }
       peerConnectionsRef.current.forEach(pc => pc.close());
       clearInterval(statsInterval);
     };
   }, [meetingId, myPeerId, displayName, virtualIp, isHost]);
 
-  // Handle Local Toggles
+  // Handle Camera/Mic Toggles
   useEffect(() => {
     if (localStreamRef.current) {
       localStreamRef.current.getAudioTracks().forEach(track => track.enabled = !isMuted);
@@ -139,20 +141,95 @@ const MeetingRoom: React.FC = () => {
     }
   }, [isMuted, isVideoOff]);
 
+  // Screen Sharing Logic
+  const startScreenShare = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const screenTrack = stream.getVideoTracks()[0];
+      
+      screenStreamRef.current = stream;
+      
+      // Update local preview
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+
+      // Replace tracks for existing peers
+      peerConnectionsRef.current.forEach((pc) => {
+        const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(screenTrack);
+        }
+      });
+
+      // Handle browser "Stop sharing" UI
+      screenTrack.onended = () => {
+        stopScreenShare();
+      };
+
+      setIsScreenSharing(true);
+    } catch (err) {
+      console.error("Screen share cancelled or failed:", err);
+    }
+  };
+
+  const stopScreenShare = async () => {
+    // Stop the screen share stream
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
+    }
+
+    // Revert to camera
+    if (localStreamRef.current && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      
+      const cameraTrack = localStreamRef.current.getVideoTracks()[0];
+      if (cameraTrack) {
+        // Ensure camera track respects current mute state
+        cameraTrack.enabled = !isVideoOff;
+        
+        peerConnectionsRef.current.forEach((pc) => {
+          const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(cameraTrack);
+          }
+        });
+      }
+    }
+    
+    setIsScreenSharing(false);
+  };
+
+  const handleScreenShareToggle = () => {
+    if (isScreenSharing) {
+      stopScreenShare();
+    } else {
+      startScreenShare();
+    }
+  };
+
   // WebRTC Signaling Logic
   const createPeerConnection = (peerId: string) => {
     if (peerConnectionsRef.current.has(peerId)) return peerConnectionsRef.current.get(peerId)!;
 
     const pc = new RTCPeerConnection(RTC_CONFIG);
     
-    // Add local tracks
+    // Add Tracks
+    // 1. Audio (Always from mic)
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => {
+      localStreamRef.current.getAudioTracks().forEach(track => {
         pc.addTrack(track, localStreamRef.current!);
       });
     }
 
-    // Handle ICE candidates
+    // 2. Video (Screen if sharing, otherwise Camera)
+    const videoTrack = screenStreamRef.current?.getVideoTracks()[0] || localStreamRef.current?.getVideoTracks()[0];
+    if (videoTrack && localStreamRef.current) {
+      // We attach the track to the localStream container so they arrive grouped
+      pc.addTrack(videoTrack, localStreamRef.current);
+    }
+
     pc.onicecandidate = (event) => {
       if (event.candidate && channelRef.current) {
         channelRef.current.send({
@@ -168,7 +245,6 @@ const MeetingRoom: React.FC = () => {
       }
     };
 
-    // Handle incoming stream
     pc.ontrack = (event) => {
       setRemoteStreams(prev => ({
         ...prev,
@@ -182,13 +258,10 @@ const MeetingRoom: React.FC = () => {
 
   const handleSignal = async (payload: any) => {
     const { type, sender, sdp, candidate } = payload;
-    
-    // Don't process own signals (redundant check but safe)
     if (sender === myPeerId) return;
 
     try {
       if (type === 'new-peer') {
-        // Someone joined, I (existing peer) initiate the call
         const pc = createPeerConnection(sender);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -199,7 +272,6 @@ const MeetingRoom: React.FC = () => {
         });
       }
       else if (type === 'offer') {
-        // I received an offer, I respond
         const pc = createPeerConnection(sender);
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
         const answer = await pc.createAnswer();
@@ -211,14 +283,12 @@ const MeetingRoom: React.FC = () => {
         });
       }
       else if (type === 'answer') {
-        // I received an answer to my offer
         const pc = peerConnectionsRef.current.get(sender);
         if (pc) {
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
         }
       }
       else if (type === 'ice-candidate') {
-        // Add candidate to PC
         const pc = peerConnectionsRef.current.get(sender);
         if (pc) {
           await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -233,13 +303,12 @@ const MeetingRoom: React.FC = () => {
     navigate('/app/dashboard');
   };
 
-  // Filter participants to exclude self for grid rendering (local video is separate)
   const remoteParticipants = participants.filter(p => p.peerId !== myPeerId);
 
   return (
     <div className="h-screen bg-slate-900 flex flex-col overflow-hidden text-white">
       
-      {/* --- Top Bar --- */}
+      {/* Top Bar */}
       <div className="h-16 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4 sm:px-6 z-10">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700 hidden sm:flex">
@@ -266,10 +335,8 @@ const MeetingRoom: React.FC = () => {
         </div>
       </div>
 
-      {/* --- Main Content --- */}
+      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden relative">
-        
-        {/* Video Grid */}
         <div className="flex-1 p-4 overflow-y-auto">
             <div className={`
               grid gap-4 h-full content-center
@@ -285,11 +352,12 @@ const MeetingRoom: React.FC = () => {
                   autoPlay 
                   muted 
                   playsInline
-                  className={`w-full h-full object-cover transform scale-x-[-1] ${isVideoOff ? 'hidden' : 'block'}`}
+                  // Don't mirror if screen sharing. Hide if video off AND not screen sharing.
+                  className={`w-full h-full object-cover transform ${isScreenSharing ? '' : 'scale-x-[-1]'} ${isVideoOff && !isScreenSharing ? 'hidden' : 'block'}`}
                 />
                 
-                {/* Local Video Off Placeholder */}
-                {isVideoOff && (
+                {/* Placeholder when camera is off and not sharing screen */}
+                {isVideoOff && !isScreenSharing && (
                   <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
                     <div className="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center">
                       <span className="text-2xl font-bold text-slate-400">{displayName.charAt(0)}</span>
@@ -333,7 +401,7 @@ const MeetingRoom: React.FC = () => {
             </div>
         </div>
 
-        {/* --- Sidebar --- */}
+        {/* Sidebar */}
         {showSidebar && (
           <div className="w-80 bg-slate-800 border-l border-slate-700 flex flex-col absolute inset-y-0 right-0 z-20 shadow-2xl sm:relative sm:shadow-none">
             <div className="p-4 border-b border-slate-700 flex justify-between items-center">
@@ -366,7 +434,7 @@ const MeetingRoom: React.FC = () => {
         )}
       </div>
 
-      {/* --- Controls Bar --- */}
+      {/* Controls Bar */}
       <div className="h-20 bg-slate-800 border-t border-slate-700 px-6 flex items-center justify-between shrink-0">
          <div className="hidden md:block w-48">
             <p className="text-sm text-slate-400">
@@ -391,7 +459,7 @@ const MeetingRoom: React.FC = () => {
             </button>
 
             <button 
-              onClick={() => setIsScreenSharing(!isScreenSharing)}
+              onClick={handleScreenShareToggle}
               className={`p-3 sm:p-4 rounded-full transition-all ${isScreenSharing ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-700 hover:bg-slate-600'}`}
             >
               <Monitor size={24} />
