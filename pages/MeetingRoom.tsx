@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { 
   Mic, MicOff, Video, VideoOff, Monitor, PhoneOff, 
-  Users, Settings, Shield, Signal, X, Loader
+  Users, Settings, Shield, Signal, X, Loader, Share2
 } from 'lucide-react';
 import { generateMockNetworkStats } from '../services/networkService';
 import { NetworkStats } from '../types';
@@ -235,6 +235,11 @@ const MeetingRoom: React.FC = () => {
     }
   };
 
+  const handleShare = () => {
+    const text = `Join my UniConnect secure meeting: ${window.location.href}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
   // WebRTC Signaling Logic
   const createPeerConnection = (peerId: string) => {
     if (peerConnectionsRef.current.has(peerId)) return peerConnectionsRef.current.get(peerId)!;
@@ -352,6 +357,15 @@ const MeetingRoom: React.FC = () => {
               <span>{Math.round(networkStats.latency)}ms</span>
             </div>
           )}
+
+          <button 
+            onClick={handleShare}
+            className="p-2 rounded-lg hover:bg-slate-700 transition-colors text-slate-300 hover:text-green-400"
+            title="Share via WhatsApp"
+          >
+            <Share2 size={20} />
+          </button>
+
           <button 
             onClick={() => setShowSidebar(!showSidebar)}
             className={`p-2 rounded-lg transition-colors ${showSidebar ? 'bg-blue-600' : 'hover:bg-slate-700'}`}
