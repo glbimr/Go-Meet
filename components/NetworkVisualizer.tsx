@@ -40,13 +40,13 @@ const NetworkVisualizer: React.FC = () => {
     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900">Tunnel Latency vs Public Internet</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Optimized Route vs Public Internet</h3>
           <p className="text-sm text-slate-500">Real-time comparison of packet traversal speed.</p>
         </div>
         <div className="flex space-x-4 text-sm">
           <div className="flex items-center">
             <span className="w-3 h-3 bg-emerald-500 rounded-full mr-2"></span>
-            <span className="text-slate-700">Proxy Tunnel (Optimized)</span>
+            <span className="text-slate-700">Optimized Route</span>
           </div>
           <div className="flex items-center">
             <span className="w-3 h-3 bg-slate-300 rounded-full mr-2"></span>
@@ -108,7 +108,7 @@ const NetworkVisualizer: React.FC = () => {
         </div>
         <div>
           <p className="text-xs text-slate-500 uppercase font-semibold">Route Protocol</p>
-          <p className="text-lg font-bold text-blue-600">UDP/Tunnel</p>
+          <p className="text-lg font-bold text-blue-600">UDP/Secure</p>
         </div>
       </div>
     </div>

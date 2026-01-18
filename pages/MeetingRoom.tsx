@@ -344,7 +344,7 @@ const MeetingRoom: React.FC = () => {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700 hidden sm:flex">
             <Shield size={16} className="text-emerald-400" />
-            <span className="text-sm font-mono text-slate-300">VIP: {virtualIp}</span>
+            <span className="text-sm font-mono text-slate-300">Secure</span>
           </div>
           <div className="h-4 w-px bg-slate-700 hidden sm:block"></div>
           <h1 className="font-semibold text-lg truncate max-w-[150px] sm:max-w-md">Room: {meetingId}</h1>
@@ -426,7 +426,7 @@ const MeetingRoom: React.FC = () => {
 
                   <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1 rounded-full flex items-center space-x-2 z-10">
                     <span className="text-sm font-medium">{p.name}</span>
-                    <span className="text-xs text-slate-400 hidden sm:inline">({p.ip})</span>
+                    {/* Removed IP display */}
                   </div>
                 </div>
               ))}
@@ -455,7 +455,7 @@ const MeetingRoom: React.FC = () => {
                       </p>
                       <p className="text-xs text-slate-400 flex items-center">
                         <Shield size={10} className="mr-1 text-emerald-500" />
-                        {p.ip}
+                        Secure Connection
                       </p>
                     </div>
                   </div>
@@ -472,7 +472,7 @@ const MeetingRoom: React.FC = () => {
             <p className="text-sm text-slate-400">
               {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
-            <p className="text-xs text-emerald-500 font-medium">Encrypted • Proxied</p>
+            <p className="text-xs text-emerald-500 font-medium">Encrypted • Protected</p>
          </div>
 
          <div className="flex items-center space-x-2 sm:space-x-4">

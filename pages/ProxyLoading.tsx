@@ -40,7 +40,7 @@ const ProxyLoading: React.FC = () => {
             Getting connection established
           </h2>
           <p className="text-slate-400">
-            Please wait while we secure your proxy tunnel...
+            Please wait while we secure your connection...
           </p>
         </div>
 

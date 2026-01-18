@@ -15,8 +15,8 @@ const Settings: React.FC = () => {
         
         <div className="flex items-center justify-between py-4 border-b border-slate-100">
           <div>
-            <p className="font-medium text-slate-900">Force Proxy Tunneling</p>
-            <p className="text-sm text-slate-500">Route all traffic through the UniConnect secure gateway.</p>
+            <p className="font-medium text-slate-900">Force Secure Routing</p>
+            <p className="text-sm text-slate-500">Route all traffic through the UniConnect secure gateway for better stability.</p>
           </div>
           <button 
             onClick={() => setProxyEnabled(!proxyEnabled)}

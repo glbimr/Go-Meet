@@ -40,11 +40,11 @@ const Dashboard: React.FC = () => {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-               <p className="text-xs text-slate-500 uppercase font-semibold">My Virtual IP</p>
-               <p className="text-xl font-mono font-bold text-slate-800">10.8.0.x</p>
+               <p className="text-xs text-slate-500 uppercase font-semibold">Connection Status</p>
+               <p className="text-xl font-mono font-bold text-slate-800">Secured</p>
              </div>
              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-               <p className="text-xs text-slate-500 uppercase font-semibold">Proxy Node</p>
+               <p className="text-xs text-slate-500 uppercase font-semibold">Routing Node</p>
                <p className="text-xl font-bold text-emerald-600">Active</p>
              </div>
              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
@@ -94,7 +94,7 @@ const Dashboard: React.FC = () => {
                  <span className="text-emerald-400">Operational</span>
                </div>
                <div className="flex justify-between text-sm">
-                 <span className="text-slate-400">Tunnel Load</span>
+                 <span className="text-slate-400">Network Load</span>
                  <span>34%</span>
                </div>
                <div className="flex justify-between text-sm">
@@ -107,7 +107,7 @@ const Dashboard: React.FC = () => {
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-6">
             <h3 className="text-blue-900 font-bold mb-2">Pro Tip</h3>
             <p className="text-blue-700 text-sm mb-4">
-              Experiencing high jitter on public WiFi? The forced proxy automatically buffers packets to smooth out audio delivery.
+              Experiencing high jitter on public WiFi? The optimized routing automatically buffers packets to smooth out audio delivery.
             </p>
             <Button size="sm" variant="ghost" className="text-blue-700 hover:bg-blue-100 p-0">
               Run Speed Test <ArrowRight size={16} className="ml-1" />

@@ -13,7 +13,7 @@ const NetworkHealth: React.FC = () => {
             <Server size={24} />
           </div>
           <div>
-            <p className="text-sm text-slate-500">Proxy Gateway</p>
+            <p className="text-sm text-slate-500">Routing Gateway</p>
             <p className="text-xl font-bold text-slate-900">US-East-1</p>
           </div>
         </div>
@@ -42,7 +42,7 @@ const NetworkHealth: React.FC = () => {
       <div className="bg-slate-900 text-white p-6 rounded-xl">
         <h3 className="font-bold text-lg mb-2">Technical Diagnostics</h3>
         <pre className="font-mono text-xs text-slate-400 overflow-x-auto">
-          {`> PING 10.8.0.1 (PROXY_GATEWAY) 56(84) bytes of data.
+          {`> PING 10.8.0.1 (SECURE_GATEWAY) 56(84) bytes of data.
 64 bytes from 10.8.0.1: icmp_seq=1 ttl=64 time=45.2 ms
 64 bytes from 10.8.0.1: icmp_seq=2 ttl=64 time=44.8 ms
 64 bytes from 10.8.0.1: icmp_seq=3 ttl=64 time=45.1 ms

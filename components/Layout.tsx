@@ -28,7 +28,7 @@ const Layout: React.FC = () => {
             <span className="text-xl font-bold tracking-tight">UniConnect</span>
           </div>
           <div className="mt-2 text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded inline-block">
-            Proxy Tunnel: Active
+            Secure Connection: Active
           </div>
         </div>
 

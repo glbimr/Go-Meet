@@ -67,10 +67,6 @@ const Home: React.FC = () => {
     }
   };
 
-  const handleEnterDashboard = () => {
-    navigate('/app/dashboard');
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
       
@@ -83,7 +79,7 @@ const Home: React.FC = () => {
           <span className="text-3xl font-bold text-slate-900 tracking-tight">UniConnect</span>
         </div>
         <p className="text-slate-500 max-w-md mx-auto">
-          Universal connectivity platform forcing stable proxy routing for seamless meetings on any network.
+          Universal connectivity platform for seamless meetings on any network.
         </p>
       </div>
 
@@ -138,17 +134,6 @@ const Home: React.FC = () => {
             </div>
 
             {error && <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded">{error}</p>}
-
-            <div className="relative text-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200"></div>
-              </div>
-              <span className="relative bg-white px-2 text-xs text-slate-400 uppercase">Or</span>
-            </div>
-
-            <Button variant="secondary" onClick={handleEnterDashboard} className="w-full">
-              Enter Dashboard
-            </Button>
           </div>
         </div>
 
@@ -160,18 +145,18 @@ const Home: React.FC = () => {
           <div>
             <div className="inline-flex items-center space-x-2 bg-slate-800 rounded-full px-3 py-1 text-xs font-medium text-emerald-400 mb-6 border border-slate-700">
               <Zap size={12} />
-              <span>Forced Proxy Active</span>
+              <span>Optimized Routing Active</span>
             </div>
             
             <h3 className="text-2xl font-bold mb-4">Why UniConnect?</h3>
             <ul className="space-y-4 text-slate-300">
               <li className="flex items-start">
                 <Activity size={20} className="mr-3 text-blue-400 flex-shrink-0" />
-                <span className="text-sm">Bypasses strict corporate firewalls and NAT restrictions via forced tunneling.</span>
+                <span className="text-sm">Bypasses network restrictions via smart secure routing.</span>
               </li>
               <li className="flex items-start">
                 <Users size={20} className="mr-3 text-blue-400 flex-shrink-0" />
-                <span className="text-sm">Unified Virtual IP routing ensures all participants appear on the same LAN.</span>
+                <span className="text-sm">Unified routing ensures all participants connect seamlessly.</span>
               </li>
               <li className="flex items-start">
                 <ShieldCheck size={20} className="mr-3 text-blue-400 flex-shrink-0" />
